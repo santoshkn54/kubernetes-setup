@@ -116,12 +116,32 @@ EOF
    systemctl disable firewalld
 
 else
+   # installing cri-containerd
+   git clone https://github.com/Mirantis/cri-dockerd.git
+   wget https://storage.googleapis.com/golang/getgo/installer_linux
+   chmod +x ./installer_linux
+   ./installer_linux
+   source ~/.bash_profile
+   cd cri-dockerd
+   mkdir bin
+   go build -o bin/cri-dockerd
+   mkdir -p /usr/local/bin
+   install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+   cp -a packaging/systemd/* /etc/systemd/system
+   sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+   systemctl daemon-reload
+   systemctl enable cri-docker.service
+   systemctl start cri-docker.service
+   
+   # installing kubeadm
 
-   sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+   sudo apt-get update
+   sudo apt-get install -y apt-transport-https ca-certificates curl
    curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-   cat <<EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list
-   deb https://apt.kubernetes.io/ kubernetes-xenial main
-EOF
+
+   sudo apt-add-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+
+   
    sudo apt-get update
    sudo apt-get install -y kubelet kubeadm kubectl
    sudo apt-mark hold kubelet kubeadm kubectl
@@ -131,11 +151,11 @@ fi
 
 #sleep 30
 
-sudo kubeadm init --pod-network-cidr 10.244.0.0/16 --apiserver-advertise-address=192.168.56.2 > /tmp/kubeadm_out.log
-sleep 360
+kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/cri-dockerd.sock > /tmp/kubeadm_out.log
+
+sleep 120
 /vagrant/set-kubeconfig.sh
-sudo kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
-kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+sudo kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
 sleep 60
 sudo cat /tmp/kubeadm_out.log | grep -A1 'kubeadm join' > /vagrant/cltjoincommand.sh
 sudo chmod +x /vagrant/cltjoincommand.sh
