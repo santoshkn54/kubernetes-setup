@@ -153,7 +153,7 @@ fi
 
 kubeadm init --pod-network-cidr=10.244.0.0/16 --cri-socket=unix:///var/run/cri-dockerd.sock > /tmp/kubeadm_out.log
 
-sleep 120
+sleep 60
 /vagrant/set-kubeconfig.sh
 sudo kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
 sleep 60
